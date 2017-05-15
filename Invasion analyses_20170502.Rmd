@@ -120,11 +120,11 @@ The y-axis is the area (cm^2^) of the invading colony's growth.
 # Results 1 and 2 above are an interaction between Invader and mediainfusion. 
 
 ```{r}
-# make a dataset that combines the three Pseudonocardia genotypes into "Ps"
+# make a column that collapses the three Pseudonocardia genotypes into "Ps"
 assay3$mediainfusion <- fct_collapse(assay3$Ps.genotype, PS = c("Ps1", "Ps2", "unknown"), ctrl = c("Control"))
 
 boxplot(Invasion.score~Invader:mediainfusion, ylab=expression("Mean colony area " ~ (cm^{2})), cex.axis=.7, cex.lab=0.8, outline=FALSE, ylim=c(0.0,1.8), whisklty=0, staplelty=0, boxlty=1, boxwex=0.3, data=assay3)
-stripchart(Invasion.score~Invader:mediainfusion, vertical=TRUE, pch=16, method="jitter", jitter=.02, cex=.3, col=as.numeric(assay4$Ps.strain), add=TRUE, data=assay3)
+stripchart(Invasion.score~Invader:mediainfusion, vertical=TRUE, pch=16, method="jitter", jitter=.02, cex=.3, add=TRUE, data=assay3)
 
 assay5 <- assay3 %>% group_by(Ps.strain, mediainfusion, Invader, Inv.strain) %>% summarise(mean.Invasion.score=mean(Invasion.score))
 
