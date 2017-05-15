@@ -1,0 +1,468 @@
+---
+title: "Analyses of Tabitha's May 2017 Microbiome invasion experiments"
+author: "Douglas Yu"
+date: "02 May 2017"
+output: html_document
+---
+
+To do:  
+1. analysis with lme: 3 random intercepts (Ps.strain, Inv.strain, Plate) and 3 random slopes, depending on model (mediainfusion, Invader, Ps.genotype)
+2. Significant Invader:mediainfusion interaction: Streptomyces grows relatively more quickly in Ps-infused media
+3. Significant Ps.genotype (Ps1 vs. Ps2 only) main effect:  Ps2 suppresses growth more effectively
+4. Calculate effect sizes of Invader:mediainfusion interaction, Ps.genotype main effect
+
+## Housekeeping
+```{r, message=FALSE}
+# rm(list=ls())
+library(nlme)
+library(readxl)
+library(dplyr)
+library(stringr)
+library(knitr)
+library(lattice)
+library(forcats)
+library(beeswarm)
+library(lme4)
+library(sjPlot)
+# tidyverse_packages()
+```
+
+## Assay 1:  Can _Streptomyces_ invade an antibiotic-laden environment (_Pseudonocardia_)?
+```{r}
+assay1 <- read_excel("Block 2 Ps bioassays_data tables_20170502_20170515.xlsx", sheet = "data_table_Strep", na = "NA")
+tbl_df(assay1) # should have 530 rows and 1 cols
+assay1 <- assay1 %>% select(-Input.order, -Notes, -Standardised.score, -Spore.production)
+assay1$Ps.strain <- as.factor(assay1$Ps.strain)
+assay1$Ps.genotype <- as.factor(assay1$Ps.genotype)
+assay1$Invader <- as.factor(assay1$Invader)
+assay1$Inv.strain <- as.factor(assay1$Inv.strain)
+assay1$Plate <- as.factor(assay1$Plate)
+assay1 <- assay1 %>% filter(!str_detect(Invasion.score, 'discount|discount plate')) # one way to filter by string rather than numeric value
+assay1$Invasion.score <- as.numeric(assay1$Invasion.score)
+assay1 # should have 492 rows and 6 cols
+```
+
+```{r}
+assay1noctrl <- assay1 %>% filter(!str_detect(Ps.genotype, 'Control'))
+# assay1noctrl <- assay1 %>% filter(Ps.genotype %in% c("Ps1", "Ps2", "unknown")) # alternative
+assay1noctrl$Ps.genotype <- droplevels(assay1noctrl$Ps.genotype)
+```
+
+Mean Streptomyces invasion zone = `r round(summarise(assay1noctrl, mean(Invasion.score)), 2)` ± `r round(summarise(assay1noctrl, sd(Invasion.score)/sqrt(length(assay1noctrl$Invasion.score))), 2)` SE mm
+
+```{r}
+(wilcox.test(assay1noctrl$Invasion.score, mu=0))
+```
+
+
+## Assay 2:  Can _Non-antibiotic-producers_ invade an antibiotic-laden environment (_Pseudonocardia_)?
+
+```{r, warning=FALSE}
+assay2 <- read_excel("Block 2 Ps bioassays_data tables_20170502_20170515.xlsx", sheet = "data_table_Sb", na = "NA")
+tbl_df(assay2) # should have 520 rows and 10 cols
+assay2 <- assay2 %>% select(-Input.order, -Notes, -Standardised.score, -Spore.production)
+assay2$Ps.strain <- as.factor(assay2$Ps.strain)
+assay2$Ps.genotype <- as.factor(assay2$Ps.genotype)
+assay2$Invader <- as.factor(assay2$Invader)
+assay2$Inv.strain <- assay2$Inv.strain + 10 # to differentiate numbering from Strepto samples
+assay2$Inv.strain <- as.factor(assay2$Inv.strain)
+assay2$Plate <- assay2$Plate + 10 # to differentiate numbering from Strepto samples
+assay2$Plate <- as.factor(assay2$Plate)
+assay2 <- assay2 %>% filter(!str_detect(Invasion.score, 'discount|discount plate'))
+assay2$Invasion.score <- as.numeric(assay2$Invasion.score)
+assay2 # should have 483 rows and 6 cols
+```
+
+```{r}
+assay2noctrl <- assay2 %>% filter(!str_detect(Ps.genotype, 'Control'))
+assay2noctrl$Ps.genotype <- droplevels(assay2noctrl$Ps.genotype)
+```
+
+Mean invasion zone = `r round(summarise(assay2noctrl, mean(Invasion.score)), 2)` ± `r round(summarise(assay2noctrl, sd(Invasion.score)/sqrt(length(assay2noctrl$Invasion.score))),2)` SE mm
+
+```{r}
+(wilcox.test(assay2noctrl$Invasion.score, mu=0))
+```
+
+
+## Assay 3:  Is _Streptomyces_ better than _Soft bugs_ at invading an antibiotic-laden environment (_Pseudonocardia_)?  
+```{r assay3, message=FALSE, warning=FALSE}
+assay3 <- bind_rows(assay1, assay2)
+assay3$Invader <- as.factor(assay3$Invader)
+assay3$Inv.strain <- factor(assay3$Inv.strain)
+assay3$Plate <- as.factor(assay3$Plate)
+assay3$Ps.strain <- relevel(assay3$Ps.strain, "Control")
+tbl_df(assay3)
+xtabs(~ Inv.strain + Ps.strain, assay3)
+```
+
+```{r}
+boxplot(Invasion.score~Invader:Ps.genotype, ylab=expression("Mean colony area " ~ (cm^{2})), cex.axis=.7, cex.lab=0.8, outline=FALSE, ylim=c(0.0,1.8), whisklty=0, staplelty=0, boxlty=1, boxwex=0.3, data=assay3)
+
+stripchart(Invasion.score~Invader:Ps.genotype, vertical=TRUE, pch=16, method="jitter", jitter=.02, cex=.4, add=TRUE, data=assay3)
+```
+
+```{r assay4 summary data table and boxplot, eval=FALSE}
+# assay4 <- assay3 %>% group_by(Ps.strain, Ps.genotype, Invader, Inv.strain) %>% summarise(mean.Invasion.score=mean(Invasion.score))
+# 
+# boxplot(mean.Invasion.score~Invader:Ps.genotype, ylab=expression("Mean colony area " ~ (cm^{2})), cex.axis=.7, cex.lab=0.8, outline=FALSE, ylim=c(0.0,1.8), whisklty=0, staplelty=0, boxlty=1, boxwex=0.3, data=assay4)
+# 
+# stripchart(mean.Invasion.score~Invader:Ps.genotype, vertical=TRUE, pch=16, method="jitter", jitter=.02, cex=.4, add=TRUE, data=assay4)
+```
+
+To read this figure:
+The y-axis is the area (cm^2^) of the invading colony's growth. 
+1. On control media (left 2 columns), Soft-bug colonies are bigger than Streptomyces colonies (i.e. Streptomyces grow more slowly). 
+2. However, on Pseudonocardia media (Ps1, Ps2, unknown genotypes), Soft-bug colonies are smaller. (i.e. Streptomyces colonies grow more quickly).
+3. Growth is generally higher on Ps1 media than on Ps2 + unknown media (i.e. Ps2 and unknown are more effective overall inhibitors).
+4. I guess that the unknown Ps genotype is Ps2.
+
+# Results 1 and 2 above are an interaction between Invader and mediainfusion. 
+
+```{r}
+# make a dataset that combines the three Pseudonocardia genotypes into "Ps"
+assay3$mediainfusion <- fct_collapse(assay3$Ps.genotype, PS = c("Ps1", "Ps2", "unknown"), ctrl = c("Control"))
+
+boxplot(Invasion.score~Invader:mediainfusion, ylab=expression("Mean colony area " ~ (cm^{2})), cex.axis=.7, cex.lab=0.8, outline=FALSE, ylim=c(0.0,1.8), whisklty=0, staplelty=0, boxlty=1, boxwex=0.3, data=assay3)
+stripchart(Invasion.score~Invader:mediainfusion, vertical=TRUE, pch=16, method="jitter", jitter=.02, cex=.3, col=as.numeric(assay4$Ps.strain), add=TRUE, data=assay3)
+
+assay5 <- assay3 %>% group_by(Ps.strain, mediainfusion, Invader, Inv.strain) %>% summarise(mean.Invasion.score=mean(Invasion.score))
+
+mod1 <- lm(mean.Invasion.score~Invader*mediainfusion, data=assay5)
+mod2 <- update(mod1, ~. - Invader:mediainfusion)
+anova(mod1, mod2)
+summary(mod1)
+par(mfrow=c(2, 2))
+plot(mod2)
+par(mfrow=c(1, 1))
+```
+
+Final model is:  mean.Invasion.score ~ Invader * mediainfusion
+Soft bugs grow faster in the Ps-free control media, and Streptomyces grow faster in the Ps-infused media. (p=0.0254)
+This is not a very good model, due to heteroscedasticity and non-normal residuals. 
+
+Also, there are correlated residuals due to 3 random factors:
+```{r}
+levels(assay3$Ps.strain)
+levels(assay3$Inv.strain)
+levels(assay3$Plate)
+```
+
+1. Pseudonocardia strain: `Ps.strain` (17 levels: A, B, D, E, F, G, J, K, L, M, N, Ø, P, Q, R, S, T) 
+2. Invader strain: `Inv.strain` (20 levels: 1-20) 
+3. Petri-dish: `Plate` (20 levels: 1-20) 
+
+The experiment is fully crossed but slightly unbalanced, so that every Inv.strain is tested against every Ps.strain (usually 30 times = 3 plates, sometimes 20 times = 2 plates). 
+
+There are 2 fixed factors:  
+1. Pseuonocardia genotype: `Ps.genotype` (Control, Ps1, Ps2, unknown). Unknown is probably Ps2, given the response values. Control is no Pseudonocardia
+2. Pseudonocardia:  `mediainfusion` (ctrl, PS).  
+3. Invader type: `Invader`(Soft_bugs (non-producers), Streptomyces)
+
+Finally, the response variable is:
+1. Mean colony area (cm^2^): `Invasion.score`
+
+I test for an interaction effect between `Invader` and `mediainfusion` to see if Streptomyces and Soft bugs reverse their superiorities when moving from control to Ps-infused media.
+
+####
+
+```{r, eval=FALSE}
+with(assay3, dotchart(Invasion.score, groups = Ps.strain, color = as.numeric(Invader), ylab="Ps.strain", xlab="Invasion.score", main="black=Soft bugs, red=Streptomyces"))
+
+print(dotplot(reorder(Inv.strain, Invasion.score) ~ Invasion.score, assay3, groups = Plate, ylab = "Inv.strain", xlab = expression("Mean colony area " ~ (cm^{2})), main = "Inv.strain", type = c("p", "a"), auto.key = list(columns = 3, lines = TRUE)))
+
+print(dotplot(reorder(Ps.strain, Invasion.score) ~ Invasion.score, assay3, groups = Plate, ylab = "Ps.strain", xlab = expression("Mean colony area " ~ (cm^{2})), main = "Ps.strain", type = c("p", "a"), auto.key = list(columns = 3, lines = TRUE)))
+
+# with(assay3, dotchart(Invasion.score, groups = Inv.strain, color = as.numeric(Ps.genotype), main="red/green=Ps2, black=Ps1"))
+```
+
+Dotchart shows that Streptomyces growth is relatively greater on Ps-infused media, but not for all Ps.strains. A large part of the variance is caused by differences amongst Inv.strain.
+
+```{r Check for correlated residuals}
+M1 <- lm(Invasion.score~Invader*Ps.genotype, data=assay3)
+E1 <- rstandard(M1)
+par(mfrow=c(2, 2))
+plot(E1 ~ assay3$Ps.strain); abline(0,0) # P,Q,T strains mostly below 0, so possibly a Ps.strain effect
+plot(E1 ~ assay3$Inv.strain); abline(0,0) # 1,4,8 mostly above or below 0, so possibly an Inv.strain effect
+plot(E1 ~ assay3$Plate); abline(0,0) # about 7 plates have mostly negative residuals, so possibly a plate effect (note that plates are numbered from 1-20)
+par(mfrow=c(1, 1))
+rm(M1)
+rm(E1)
+
+```
+
+Ps.strain, Inv.strain, and Plate all appear to have correlated residuals, esp. Inv.strain.
+
+
+######
+# lme4 version of analysis (dataset = assay3)
+Testing if there is a significant effect of Ps-infused media on the winning invader
+
+```{r}
+# random intercepts only
+M1 <- lmer(Invasion.score ~ Invader*mediainfusion + (1|Ps.strain) + (1|Inv.strain) + (1|Plate), data=assay3, REML = FALSE)
+
+M2 <- lmer(Invasion.score ~ Invader + mediainfusion + (1|Ps.strain) + (1|Inv.strain) + (1|Plate), data=assay3, REML = FALSE)
+
+anova(M1, M2) # highly significant, p=0.000000090 (p=8.999e-08)
+AIC(M1, M2) # M1 has lower AIC 289.6
+coef(M1)
+fixef(M1)
+summary(M1)
+sjp.resid(M1)
+sjp.lmer(M1, type = "re.qq", y.offset = 0.4)
+sjp.lmer(M1, y.offset = 0.4)
+
+qqmath(ranef(M1))
+```
+
+Using only random intercepts, the best model is M1 (AIC=289.6): 
+
+Invasion.score ~ Invader * Ps.genotype + (1 | Ps.strain) + (1 | Inv.strain) + (1 | Plate)
+
+Random and Fixed factors:
+```{r}
+par(mfrow=c(2, 2))
+plot(assay3$Ps.strain, resid(M1), xlab="Ps.strain", ylab="Residuals"); abline(0,0)
+plot(assay3$Inv.strain, resid(M1), xlab="Inv.strain", ylab="Residuals"); abline(0,0)
+plot(assay3$Plate, resid(M1), xlab="Plate", ylab="Residuals"); abline(0,0)
+par(mfrow=c(1,1))
+
+plot(assay3$Ps.genotype, resid(M1), xlab="Ps.genotype", ylab="Residuals"); abline(0,0)
+plot(assay3$Invader, resid(M1), xlab="Invader", ylab="Residuals"); abline(0,0)
+```
+
+The residuals of the random factors no longer show structure. However, Soft bugs still show greater residual variance than do Streptomyces. So now i try to add fixed-effect variables to the slopes (but not to the Ps.strain/Inv.strain random factor, as those are confounded).
+
+
+```{r}
+M3 <- lmer(Invasion.score ~ Invader*mediainfusion + (1 + Invader|Ps.strain) + (1|Inv.strain) + (1 + Invader|Plate), data=assay3, REML = FALSE)
+
+M4 <- lmer(Invasion.score ~ Invader + mediainfusion + (1 + Invader|Ps.strain) + (1|Inv.strain) + (1 + Invader|Plate), data=assay3, REML = FALSE)
+
+M5 <- lmer(Invasion.score ~ Invader*mediainfusion + (1|Ps.strain) + (1 + mediainfusion|Inv.strain) + (1 + mediainfusion|Plate), data=assay3, REML = FALSE)
+
+M6 <- lmer(Invasion.score ~ Invader + mediainfusion + (1|Ps.strain) + (1 + mediainfusion|Inv.strain) + (1 + mediainfusion|Plate), data=assay3, REML = FALSE)
+
+
+anova(M3, M4) # Invader as random slope, M3 better AIC 278.4, sig interaction 0.0044
+anova(M5, M6) # mediainfusion as random slope, M5 better AIC 286.8, sig interaction 0.0098
+AIC(M1, M3, M5) # go with M3 model
+
+# to estimate coefficients, set REML=TRUE
+M3.1 <- lmer(Invasion.score ~ Invader*mediainfusion + (1 + Invader|Ps.strain) + (1|Inv.strain) + (1 + Invader|Plate), data=assay3, REML = TRUE)
+
+# coef(M3.1)
+summary(M3.1)
+fixef(M3.1)
+sjp.resid(M3.1)
+sjp.lmer(M3.1, type = "re.qq", y.offset = 0.4)
+sjp.lmer(M3.1, y.offset = 0.4)
+fixef(M3.1)
+qqmath(ranef(M3.1))
+```
+
+Inv.strain is the biggest contributor of variance, followed by Residual variance. There is 33X less variance caused by Plate (albeit this part is unbalanced), and 5X less variance caused by Ps.strain.
+
+Random effects:
+ Groups     Name                Variance Std.Dev. Corr 
+ Plate      (Intercept)         0.003209 0.05665       
+            InvaderStreptomyces 0.003209 0.05665  -1.00
+ Inv.strain (Intercept)         0.104872 0.32384       
+ Ps.strain  (Intercept)         0.020730 0.14398       
+            InvaderStreptomyces 0.010065 0.10033  -0.53
+ Residual                       0.064793 0.25454       
+Number of obs: 975, groups:  Plate, 20; Inv.strain, 20; Ps.strain, 18
+
+Random and Fixed factors:
+```{r}
+par(mfrow=c(2, 2))
+plot(assay3$Ps.strain, resid(M3.1), xlab="Ps.strain", ylab="Residuals"); abline(0,0)
+plot(assay3$Inv.strain, resid(M3.1), xlab="Inv.strain", ylab="Residuals"); abline(0,0)
+plot(assay3$Plate, resid(M3.1), xlab="Plate", ylab="Residuals"); abline(0,0)
+par(mfrow=c(1, 1))
+
+plot(assay3$Ps.genotype, resid(M3.1), xlab="Ps.genotype", ylab="Residuals"); abline(0,0)
+plot(assay3$Invader, resid(M3.1), xlab="Invader", ylab="Residuals"); abline(0,0)
+```
+
+# Now test for the effect Ps1 vs. Ps2. Delete the "Control" and "unknown" levels in Ps.genotype. 
+
+```{r}
+assay6 <- assay3 %>% filter(Ps.genotype %in% c("Ps1", "Ps2"))
+assay6$Ps.genotype <- droplevels(assay6$Ps.genotype)
+
+M7 <- lmer(Invasion.score ~ Invader*Ps.genotype + (1 + Invader|Ps.strain) + (1|Inv.strain) + (1 + Invader|Plate), data=assay6, REML = FALSE)
+
+M8 <- lmer(Invasion.score ~ Invader + Ps.genotype + (1 + Invader|Ps.strain) + (1|Inv.strain) + (1 + Invader|Plate), data=assay6, REML = FALSE)
+
+M9  <- lmer(Invasion.score ~ Invader + (1 + Invader|Ps.strain) + (1|Inv.strain) + (1 + Invader|Plate), data=assay6, REML = FALSE)
+
+M10 <- lmer(Invasion.score ~ Invader*Ps.genotype + (1|Ps.strain) + (1 + Ps.genotype|Inv.strain) + (1 + Ps.genotype|Plate), data=assay6, REML = FALSE)
+
+M11 <- lmer(Invasion.score ~ Invader + Ps.genotype + (1|Ps.strain) + (1 + Ps.genotype|Inv.strain) + (1 + Ps.genotype|Plate), data=assay6, REML = FALSE)
+
+M12 <- lmer(Invasion.score ~ Invader + (1|Ps.strain) + (1 + Ps.genotype|Inv.strain) + (1 + Ps.genotype|Plate), data=assay6, REML = FALSE)
+
+anova(M7, M8)
+anova(M8, M9) # sig effect of Ps.genotype, p=0.01004
+
+anova(M10, M11)
+anova(M11, M12) # sig effect of Ps.genotype, p=0.025
+
+AIC(M8, M11) # M11 superior, AIC = 144.5, Use M11
+
+# Estimate parameters with REML = TRUE
+M11.1 <- lmer(Invasion.score ~ Invader + Ps.genotype + (1|Ps.strain) + (1 + Ps.genotype|Inv.strain) + (1 + Ps.genotype|Plate), data=assay6, REML = TRUE)
+
+
+summary(M11.1)
+fixef(M11.1) # Ps2 has a lower growth rate (-0.19)
+sjp.resid(M11.1)
+sjp.lmer(M11.1, type = "re.qq", y.offset = 0.4)
+sjp.lmer(M11.1, y.offset = 0.4)
+qqmath(ranef(M11.1))
+```
+
+Fixed effects:
+                    Estimate Std. Error t value
+(Intercept)          0.79433    0.12203   6.509
+InvaderStreptomyces  0.07388    0.13233   0.558
+Ps.genotypePs2      -0.18620    0.08143  -2.287
+
+
+Random and Fixed factors:
+```{r}
+par(mfrow=c(2, 2))
+plot(assay6$Ps.strain, resid(M11.1), xlab="Ps.strain", ylab="Residuals"); abline(0,0)
+plot(assay6$Inv.strain, resid(M11.1), xlab="Inv.strain", ylab="Residuals"); abline(0,0)
+plot(assay6$Plate, resid(M11.1), xlab="Plate", ylab="Residuals"); abline(0,0)
+par(mfrow=c(1, 1))
+
+plot(assay6$Ps.genotype, resid(M11.1), xlab="Ps.genotype", ylab="Residuals"); abline(0,0)
+plot(assay6$Invader, resid(M11.1), xlab="Invader", ylab="Residuals"); abline(0,0)
+```
+
+
+
+
+######
+# nlme mixed-effect model (dataset = assay3)
+The full model with no random factors is:
+
+```{r}
+M1 <- gls(Invasion.score ~ Invader*Ps.genotype, data=assay3)
+summary(M1) # aliased to Ps.genotype = control. 
+M1.1 <- gls(Invasion.score ~ Invader*mediainfusion, data=assay3)
+summary(M1.1) # aliased to media = control
+```
+
+# Either way, there is a significant interaction effect, such that Streptomyces do better on 
+
+The full model with random factors is:
+
+```{r}
+M2 <- lme(Invasion.score~Invader*Ps.genotype, random = ~1 | Inv.strain, data=assay3)
+M2.1 <- lme(Invasion.score~Invader*Ps.genotype, random = ~1 | Ps.strain, data=assay3)
+
+anova(M1,M1.1,M2)
+anova(M1,M1.1,M2,M2.1)
+```
+
+`r 0.5 * (1 - pchisq(362.5, 1))` # p is basically 0
+
+M2 has a much lower AIC value (379.0) than M1 (1074.9), M1.1 (1082.7), and M2.1 (1061.5), which isn't too surprising, since we saw autocorrelated residuals.
+
+```{r}
+plot(M1, col=as.numeric(assay3$Ps.genotype))
+plot(M1.1, col=as.numeric(assay3$mediainfusion))
+plot(M2, col=as.numeric(assay3$Ps.genotype))
+plot(M2, col=as.numeric(assay3$Invader)) 
+```
+
+Random and Fixed factors:
+```{r}
+plot(assay3$Ps.strain, resid(M2), xlab="Ps.strain", ylab="Residuals"); abline(0,0)
+plot(assay3$Inv.strain, resid(M2), xlab="Inv.strain", ylab="Residuals"); abline(0,0)
+plot(assay3$Plate, resid(M2), xlab="Plate", ylab="Residuals"); abline(0,0)
+
+plot(assay3$Invader, resid(M2), xlab="Invader", ylab="Residuals"); abline(0,0)
+plot(assay3$Ps.genotype, resid(M2), xlab="Ps.genotype", ylab="Residuals"); abline(0,0)
+plot(assay3$mediainfusion, resid(M2), xlab="mediainfusion", ylab="Residuals"); abline(0,0)
+```
+
+Ps.strain and Plate have heterogeneous residuals (less so Inv.strain).
+
+Invader, Ps.genotype, and medinfusion have heterogeneous residuals.  In particular, Softbugs have larger residuals than do Streptomyces, which is probably because they have a wider range of genotypes (different genera).
+
+Trying to remove heteroscedasticity.
+```{r}
+M3 <- lme(Invasion.score~Invader*Ps.genotype, random = ~ 1 | Inv.strain, weights = varIdent(form = ~ 1 | Invader), data=assay3)
+
+anova(M2, M3)
+E3 <- resid(M3, type="normalized")
+boxplot(E3 ~ Invader, ylab="Normalized residuals", vertical=T, data=assay3)
+```
+
+M3 has a lower AIC (288.0) but still has heterogeneous residuals (less so than in M2, however). 
+
+```{r}
+M4 <- lme(Invasion.score~Invader*Ps.genotype, random = ~ 1 | Inv.strain, weights = varIdent(form = ~ 1 | Invader*Ps.genotype), data=assay3)
+
+anova(M2, M3, M4)
+E4 <- resid(M4, type="normalized")
+boxplot(E4 ~ Invader, ylab="Normalized residuals", vertical=T, data=assay3)
+densityplot(~E4,data=assay3,groups = Invader, plot.points = FALSE, ref = TRUE, auto.key = list(space = "right"))
+plot(assay3$Invader, resid(M4), xlab="Invader", ylab="Residuals"); abline(0,0)
+plot(assay3$Ps.genotype, resid(M4), xlab="Ps.genotype", ylab="Residuals"); abline(0,0)
+plot(assay3$mediainfusion, resid(M4), xlab="mediainfusion", ylab="Residuals"); abline(0,0)
+
+```
+
+M4 has an even lower AIC (281.2), but there is still a lot of heteroscedasticity. I'm done here, for now. 
+I can't add `Inv.strain` or `Ps.strain` to the weights function (model doesn't converge). So I'm done.
+
+
+```{r}
+M4full <- lme(Invasion.score~Invader*Ps.genotype, random = ~ 1 | Inv.strain, weights = varIdent(form = ~ 1 | Invader*Ps.genotype), method = "ML", data=assay3)
+
+M4sub <- update(M4full, ~.-Invader*Ps.genotype)
+
+anova(M4full, M4sub)
+```
+
+Removal of the interaction term results in a significant difference (p<0.0001), and M4full has a lower AIC value (246.3) compared to M4sub (AIC = 325.1), so we keep the full model.
+
+```{r}
+Mfinal <- lme(Invasion.score~Invader*Ps.genotype, random = ~ 1 | Inv.strain, weights = varIdent(form = ~ 1 | Invader*Ps.genotype), method = "REML", data=assay3)
+
+qqnorm(Mfinal)
+intervals(Mfinal, which="fixed")
+summary(Mfinal)
+```
+
+However, I suspect that Ps.genotype 'unknown' is really Ps2. So let's combine "Ps2" and "unknown" into Ps2.
+
+```{r Combining Ps.genotypes}
+assay3$Ps.genotype.comb <- fct_collapse(assay3$Ps.genotype, Ps2 = c("Ps2", "unknown", "unknown"), Ps1 = c("Ps1"), Control = c("Control"))
+assay3$Ps.genotype.comb <- as.factor(assay3$Ps.genotype.comb)
+
+M4full2 <- lme(Invasion.score~Invader*Ps.genotype.comb, random = ~ 1 | Inv.strain, weights = varIdent(form = ~ 1 | Invader*Ps.genotype.comb), method = "ML", data=assay3)
+
+M4sub2 <- update(M4full, ~.-Invader*Ps.genotype.comb)
+
+anova(M4full2, M4sub2)
+anova(M4full, M4full2)
+summary(M4full2)
+```
+
+There is a significant difference between M4full2 and Mfsub2 (p=0.0005), so it is still worth keeping the interaction term. However, the AIC value for M4full2 is higher (258.5) than M4full, so it's worth using M4full and not combining "unknown" into "Ps2".
+
+Streptomyces grows relatively faster on Ps1/2 media. 
+
+
+
+```{r, eval=FALSE, include=FALSE}
+purl("Invasion analyses 20170502.Rmd")
+```
+
