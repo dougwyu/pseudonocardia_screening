@@ -10,6 +10,7 @@ To do:
 2. Significant Invader:mediainfusion interaction: Streptomyces grows relatively more quickly in Ps-infused media
 3. Significant Ps.genotype (Ps1 vs. Ps2 only) main effect:  Ps2 suppresses growth more effectively
 4. Calculate effect sizes of Invader:mediainfusion interaction, Ps.genotype main effect
+5. fix beeswarm command on line 107.
 
 ## Housekeeping
 ```{r, message=FALSE}
@@ -27,11 +28,16 @@ library(sjPlot)
 # tidyverse_packages()
 ```
 
+```{r}
+datafile <- "Block 2 Ps bioassays_data tables_20170502_20170516.xlsx"
+```
+
+
 ## Assay 1:  Can _Streptomyces_ invade an antibiotic-laden environment (_Pseudonocardia_)?
 ```{r}
-assay1 <- read_excel("Block 2 Ps bioassays_data tables_20170502_20170515.xlsx", sheet = "data_table_Strep", na = "NA")
+assay1 <- read_excel(datafile, sheet = "data_table_Strep", na = "NA")
 tbl_df(assay1) # should have 530 rows and 1 cols
-assay1 <- assay1 %>% select(-Input.order, -Notes, -Standardised.score, -Spore.production)
+assay1 <- assay1 %>% select(-Input.order, -Plate.orig, -Notes, -Standardised.score, -Spore.production)
 assay1$Ps.strain <- as.factor(assay1$Ps.strain)
 assay1$Ps.genotype <- as.factor(assay1$Ps.genotype)
 assay1$Invader <- as.factor(assay1$Invader)
@@ -58,15 +64,15 @@ Mean Streptomyces invasion zone = `r round(summarise(assay1noctrl, mean(Invasion
 ## Assay 2:  Can _Non-antibiotic-producers_ invade an antibiotic-laden environment (_Pseudonocardia_)?
 
 ```{r, warning=FALSE}
-assay2 <- read_excel("Block 2 Ps bioassays_data tables_20170502_20170515.xlsx", sheet = "data_table_Sb", na = "NA")
+assay2 <- read_excel(datafile, sheet = "data_table_Sb", na = "NA")
 tbl_df(assay2) # should have 520 rows and 10 cols
-assay2 <- assay2 %>% select(-Input.order, -Notes, -Standardised.score, -Spore.production)
+assay2 <- assay2 %>% select(-Input.order, -Plate.orig, -Notes, -Standardised.score, -Spore.production)
 assay2$Ps.strain <- as.factor(assay2$Ps.strain)
 assay2$Ps.genotype <- as.factor(assay2$Ps.genotype)
 assay2$Invader <- as.factor(assay2$Invader)
 assay2$Inv.strain <- assay2$Inv.strain + 10 # to differentiate numbering from Strepto samples
 assay2$Inv.strain <- as.factor(assay2$Inv.strain)
-assay2$Plate <- assay2$Plate + 10 # to differentiate numbering from Strepto samples
+# assay2$Plate <- assay2$Plate + 10 # to differentiate numbering from Strepto samples
 assay2$Plate <- as.factor(assay2$Plate)
 assay2 <- assay2 %>% filter(!str_detect(Invasion.score, 'discount|discount plate'))
 assay2$Invasion.score <- as.numeric(assay2$Invasion.score)
@@ -99,7 +105,9 @@ xtabs(~ Inv.strain + Ps.strain, assay3)
 ```{r}
 boxplot(Invasion.score~Invader:Ps.genotype, ylab=expression("Mean colony area " ~ (cm^{2})), cex.axis=.7, cex.lab=0.8, outline=FALSE, ylim=c(0.0,1.8), whisklty=0, staplelty=0, boxlty=1, boxwex=0.3, data=assay3)
 
-stripchart(Invasion.score~Invader:Ps.genotype, vertical=TRUE, pch=16, method="jitter", jitter=.02, cex=.4, add=TRUE, data=assay3)
+# beeswarm(Invasion.score~Invader:Ps.genotype, vertical=TRUE, pch=16, method="swarm", cex=.6, col=as.numeric(assay3$Ps.strain), add=TRUE, data=assay3)
+
+stripchart(Invasion.score~Invader:Ps.genotype, vertical=TRUE, pch=16, method="jitter", jitter=.03, cex=.3, add=TRUE, data=assay3)
 ```
 
 ```{r assay4 summary data table and boxplot, eval=FALSE}
@@ -183,15 +191,14 @@ M1 <- lm(Invasion.score~Invader*Ps.genotype, data=assay3)
 E1 <- rstandard(M1)
 par(mfrow=c(2, 2))
 plot(E1 ~ assay3$Ps.strain); abline(0,0) # P,Q,T strains mostly below 0, so possibly a Ps.strain effect
-plot(E1 ~ assay3$Inv.strain); abline(0,0) # 1,4,8 mostly above or below 0, so possibly an Inv.strain effect
-plot(E1 ~ assay3$Plate); abline(0,0) # about 7 plates have mostly negative residuals, so possibly a plate effect (note that plates are numbered from 1-20)
+plot(E1 ~ assay3$Inv.strain); abline(0,0) # many strains mostly above or below 0, so possibly an Inv.strain effect
+plot(E1 ~ assay3$Plate); abline(0,0) # multiple plates mostly above or below 0, so possibly a plate effect (note: there are 99 plates)
 par(mfrow=c(1, 1))
 rm(M1)
 rm(E1)
-
 ```
 
-Ps.strain, Inv.strain, and Plate all appear to have correlated residuals, esp. Inv.strain.
+Ps.strain, Inv.strain, and Plate all appear to have correlated residuals, esp. Inv.strain and Plate
 
 
 ######
