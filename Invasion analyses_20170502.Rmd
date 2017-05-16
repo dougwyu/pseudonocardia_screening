@@ -179,7 +179,7 @@ with(assay3, dotchart(Invasion.score, groups = Ps.strain, color = as.numeric(Inv
 
 print(dotplot(reorder(Inv.strain, Invasion.score) ~ Invasion.score, assay3, groups = Plate, ylab = "Inv.strain", xlab = expression("Mean colony area " ~ (cm^{2})), main = "Inv.strain", type = c("p", "a"), auto.key = list(columns = 3, lines = TRUE)))
 
-print(dotplot(reorder(Ps.strain, Invasion.score) ~ Invasion.score, assay3, groups = Plate, ylab = "Ps.strain", xlab = expression("Mean colony area " ~ (cm^{2})), main = "Ps.strain", type = c("p", "a"), auto.key = list(columns = 3, lines = TRUE)))
+# print(dotplot(reorder(Ps.strain, Invasion.score) ~ Invasion.score, assay3, groups = Plate, ylab = "Ps.strain", xlab = expression("Mean colony area " ~ (cm^{2})), main = "Ps.strain", type = c("p", "a"), auto.key = list(columns = 3, lines = TRUE)))
 
 # with(assay3, dotchart(Invasion.score, groups = Inv.strain, color = as.numeric(Ps.genotype), main="red/green=Ps2, black=Ps1"))
 ```
@@ -211,8 +211,8 @@ M1 <- lmer(Invasion.score ~ Invader*mediainfusion + (1|Ps.strain) + (1|Inv.strai
 
 M2 <- lmer(Invasion.score ~ Invader + mediainfusion + (1|Ps.strain) + (1|Inv.strain) + (1|Plate), data=assay3, REML = FALSE)
 
-anova(M1, M2) # highly significant, p=0.000000090 (p=8.999e-08)
-AIC(M1, M2) # M1 has lower AIC 289.6
+anova(M1, M2) # highly significant, p=0.00114
+AIC(M1, M2) # M1 has lower AIC 220.8375
 coef(M1)
 fixef(M1)
 summary(M1)
@@ -223,7 +223,7 @@ sjp.lmer(M1, y.offset = 0.4)
 qqmath(ranef(M1))
 ```
 
-Using only random intercepts, the best model is M1 (AIC=289.6): 
+Using only random intercepts, the best model is M1 (AIC=220.8): 
 
 Invasion.score ~ Invader * Ps.genotype + (1 | Ps.strain) + (1 | Inv.strain) + (1 | Plate)
 
@@ -239,7 +239,9 @@ plot(assay3$Ps.genotype, resid(M1), xlab="Ps.genotype", ylab="Residuals"); ablin
 plot(assay3$Invader, resid(M1), xlab="Invader", ylab="Residuals"); abline(0,0)
 ```
 
-The residuals of the random factors no longer show structure. However, Soft bugs still show greater residual variance than do Streptomyces. So now i try to add fixed-effect variables to the slopes (but not to the Ps.strain/Inv.strain random factor, as those are confounded).
+The residuals of the random factors no longer show structure. Soft bugs still show greater residual variance than do Streptomyces. 
+
+Now i try to add fixed-effect variables to the slopes (but not to the Ps.strain/Inv.strain random factor, as those are confounded).
 
 
 ```{r}
@@ -252,45 +254,44 @@ M5 <- lmer(Invasion.score ~ Invader*mediainfusion + (1|Ps.strain) + (1 + mediain
 M6 <- lmer(Invasion.score ~ Invader + mediainfusion + (1|Ps.strain) + (1 + mediainfusion|Inv.strain) + (1 + mediainfusion|Plate), data=assay3, REML = FALSE)
 
 
-anova(M3, M4) # Invader as random slope, M3 better AIC 278.4, sig interaction 0.0044
-anova(M5, M6) # mediainfusion as random slope, M5 better AIC 286.8, sig interaction 0.0098
-AIC(M1, M3, M5) # go with M3 model
+anova(M3, M4) # Invader as random slope, M3 better AIC 222.79, sig interaction 0.0079
+anova(M5, M6) # mediainfusion as random slope, M5 better AIC 220.51, sig interaction 0.0189
+AIC(M1, M3, M5) # go with M1 model.  Only M1 converges, and it has almost the same low AIC as M5 (both AIC=220.something)
 
 # to estimate coefficients, set REML=TRUE
-M3.1 <- lmer(Invasion.score ~ Invader*mediainfusion + (1 + Invader|Ps.strain) + (1|Inv.strain) + (1 + Invader|Plate), data=assay3, REML = TRUE)
+M1.1 <- lmer(Invasion.score ~ Invader*mediainfusion + (1|Ps.strain) + (1|Inv.strain) + (1|Plate), data=assay3, REML = TRUE)
 
-# coef(M3.1)
-summary(M3.1)
-fixef(M3.1)
-sjp.resid(M3.1)
-sjp.lmer(M3.1, type = "re.qq", y.offset = 0.4)
-sjp.lmer(M3.1, y.offset = 0.4)
-fixef(M3.1)
-qqmath(ranef(M3.1))
+# coef(M1.1)
+summary(M1.1)
+fixef(M1.1) # Streptomyces grow relatively faster on Ps-infused media
+sjp.resid(M1.1)
+sjp.lmer(M1.1, type = "re.qq", y.offset = 0.4)
+sjp.lmer(M1.1, y.offset = 0.4)
+qqmath(ranef(M1.1))
 ```
 
-Inv.strain is the biggest contributor of variance, followed by Residual variance. There is 33X less variance caused by Plate (albeit this part is unbalanced), and 5X less variance caused by Ps.strain.
+Inv.strain is the biggest contributor of variance, followed by Residual variance. There is 7X less variance caused by Plate (albeit this part is unbalanced), and 8X less variance caused by Ps.strain.
 
 Random effects:
- Groups     Name                Variance Std.Dev. Corr 
- Plate      (Intercept)         0.003209 0.05665       
-            InvaderStreptomyces 0.003209 0.05665  -1.00
- Inv.strain (Intercept)         0.104872 0.32384       
- Ps.strain  (Intercept)         0.020730 0.14398       
-            InvaderStreptomyces 0.010065 0.10033  -0.53
- Residual                       0.064793 0.25454       
-Number of obs: 975, groups:  Plate, 20; Inv.strain, 20; Ps.strain, 18
+ Groups     Name        Variance Std.Dev.
+ Plate      (Intercept) 0.01458  0.1207  
+ Inv.strain (Intercept) 0.10528  0.3245  
+ Ps.strain  (Intercept) 0.01268  0.1126  
+ Residual               0.05685  0.2384  
+Number of obs: 975, groups:  Plate, 99; Inv.strain, 20; Ps.strain, 18
 
 Random and Fixed factors:
 ```{r}
 par(mfrow=c(2, 2))
-plot(assay3$Ps.strain, resid(M3.1), xlab="Ps.strain", ylab="Residuals"); abline(0,0)
-plot(assay3$Inv.strain, resid(M3.1), xlab="Inv.strain", ylab="Residuals"); abline(0,0)
-plot(assay3$Plate, resid(M3.1), xlab="Plate", ylab="Residuals"); abline(0,0)
+plot(assay3$Ps.strain, resid(M1.1), xlab="Ps.strain", ylab="Residuals"); abline(0,0)
+plot(assay3$Inv.strain, resid(M1.1), xlab="Inv.strain", ylab="Residuals"); abline(0,0)
+plot(assay3$Plate, resid(M1.1), xlab="Plate", ylab="Residuals"); abline(0,0)
+# still some correlated residuals with Plate, which need to be removed somehow, perhaps with Plate as a random slope?
 par(mfrow=c(1, 1))
 
-plot(assay3$Ps.genotype, resid(M3.1), xlab="Ps.genotype", ylab="Residuals"); abline(0,0)
-plot(assay3$Invader, resid(M3.1), xlab="Invader", ylab="Residuals"); abline(0,0)
+
+plot(assay3$Ps.genotype, resid(M1.1), xlab="Ps.genotype", ylab="Residuals"); abline(0,0)
+plot(assay3$Invader, resid(M1.1), xlab="Invader", ylab="Residuals"); abline(0,0)
 ```
 
 # Now test for the effect Ps1 vs. Ps2. Delete the "Control" and "unknown" levels in Ps.genotype. 
@@ -299,55 +300,53 @@ plot(assay3$Invader, resid(M3.1), xlab="Invader", ylab="Residuals"); abline(0,0)
 assay6 <- assay3 %>% filter(Ps.genotype %in% c("Ps1", "Ps2"))
 assay6$Ps.genotype <- droplevels(assay6$Ps.genotype)
 
-M7 <- lmer(Invasion.score ~ Invader*Ps.genotype + (1 + Invader|Ps.strain) + (1|Inv.strain) + (1 + Invader|Plate), data=assay6, REML = FALSE)
+M7 <- lmer(Invasion.score ~ Invader*Ps.genotype + (1|Ps.strain) + (1|Inv.strain) + (1|Plate), data=assay6, REML = FALSE)
 
-M8 <- lmer(Invasion.score ~ Invader + Ps.genotype + (1 + Invader|Ps.strain) + (1|Inv.strain) + (1 + Invader|Plate), data=assay6, REML = FALSE)
+M8 <- lmer(Invasion.score ~ Invader + Ps.genotype + (1|Ps.strain) + (1|Inv.strain) + (1|Plate), data=assay6, REML = FALSE)
 
-M9  <- lmer(Invasion.score ~ Invader + (1 + Invader|Ps.strain) + (1|Inv.strain) + (1 + Invader|Plate), data=assay6, REML = FALSE)
+M9  <- lmer(Invasion.score ~ Invader + (1|Ps.strain) + (1|Inv.strain) + (1 |Plate), data=assay6, REML = FALSE)
 
-M10 <- lmer(Invasion.score ~ Invader*Ps.genotype + (1|Ps.strain) + (1 + Ps.genotype|Inv.strain) + (1 + Ps.genotype|Plate), data=assay6, REML = FALSE)
+# M10 <- lmer(Invasion.score ~ Invader*Ps.genotype + (1|Ps.strain) + (1 + Ps.genotype|Inv.strain) + (1 + Ps.genotype|Plate), data=assay6, REML = FALSE)
+# 
+# M11 <- lmer(Invasion.score ~ Invader + Ps.genotype + (1|Ps.strain) + (1 + Ps.genotype|Inv.strain) + (1 + Ps.genotype|Plate), data=assay6, REML = FALSE)
+# 
+# M12 <- lmer(Invasion.score ~ Invader + (1|Ps.strain) + (1 + Ps.genotype|Inv.strain) + (1 + Ps.genotype|Plate), data=assay6, REML = FALSE)
 
-M11 <- lmer(Invasion.score ~ Invader + Ps.genotype + (1|Ps.strain) + (1 + Ps.genotype|Inv.strain) + (1 + Ps.genotype|Plate), data=assay6, REML = FALSE)
+anova(M7, M8) # no sig interaction effect p=0.1537
+anova(M8, M9) # sig effect of Ps.genotype, p=0.004239, best model M8 AIC = 159.82
 
-M12 <- lmer(Invasion.score ~ Invader + (1|Ps.strain) + (1 + Ps.genotype|Inv.strain) + (1 + Ps.genotype|Plate), data=assay6, REML = FALSE)
-
-anova(M7, M8)
-anova(M8, M9) # sig effect of Ps.genotype, p=0.01004
-
-anova(M10, M11)
-anova(M11, M12) # sig effect of Ps.genotype, p=0.025
-
-AIC(M8, M11) # M11 superior, AIC = 144.5, Use M11
+# anova(M10, M11)
+# anova(M11, M12) # sig effect of Ps.genotype, p=0.025
+# AIC(M8, M11) # M11 superior, AIC = 144.5, Use M11
 
 # Estimate parameters with REML = TRUE
-M11.1 <- lmer(Invasion.score ~ Invader + Ps.genotype + (1|Ps.strain) + (1 + Ps.genotype|Inv.strain) + (1 + Ps.genotype|Plate), data=assay6, REML = TRUE)
+M8.1 <- lmer(Invasion.score ~ Invader + Ps.genotype + (1|Ps.strain) + (1|Inv.strain) + (1|Plate), data=assay6, REML = TRUE)
 
-
-summary(M11.1)
-fixef(M11.1) # Ps2 has a lower growth rate (-0.19)
-sjp.resid(M11.1)
-sjp.lmer(M11.1, type = "re.qq", y.offset = 0.4)
-sjp.lmer(M11.1, y.offset = 0.4)
-qqmath(ranef(M11.1))
+summary(M8.1)
+fixef(M8.1) # Ps2 causes a lower growth rate (-0.179)
+sjp.resid(M8.1)
+sjp.lmer(M8.1, type = "re.qq", y.offset = 0.4)
+sjp.lmer(M8.1, y.offset = 0.4)
+qqmath(ranef(M8.1))
 ```
 
 Fixed effects:
                     Estimate Std. Error t value
-(Intercept)          0.79433    0.12203   6.509
-InvaderStreptomyces  0.07388    0.13233   0.558
-Ps.genotypePs2      -0.18620    0.08143  -2.287
+(Intercept)          0.81323    0.10760   7.558
+InvaderStreptomyces  0.03164    0.14043   0.225
+Ps.genotypePs2      -0.17937    0.05676  -3.160
 
 
 Random and Fixed factors:
 ```{r}
 par(mfrow=c(2, 2))
-plot(assay6$Ps.strain, resid(M11.1), xlab="Ps.strain", ylab="Residuals"); abline(0,0)
-plot(assay6$Inv.strain, resid(M11.1), xlab="Inv.strain", ylab="Residuals"); abline(0,0)
-plot(assay6$Plate, resid(M11.1), xlab="Plate", ylab="Residuals"); abline(0,0)
+plot(assay6$Ps.strain, resid(M8.1), xlab="Ps.strain", ylab="Residuals"); abline(0,0)
+plot(assay6$Inv.strain, resid(M8.1), xlab="Inv.strain", ylab="Residuals"); abline(0,0)
+plot(assay6$Plate, resid(M8.1), xlab="Plate", ylab="Residuals"); abline(0,0)
 par(mfrow=c(1, 1))
 
-plot(assay6$Ps.genotype, resid(M11.1), xlab="Ps.genotype", ylab="Residuals"); abline(0,0)
-plot(assay6$Invader, resid(M11.1), xlab="Invader", ylab="Residuals"); abline(0,0)
+plot(assay6$Ps.genotype, resid(M8.1), xlab="Ps.genotype", ylab="Residuals"); abline(0,0)
+plot(assay6$Invader, resid(M8.1), xlab="Invader", ylab="Residuals"); abline(0,0)
 ```
 
 
