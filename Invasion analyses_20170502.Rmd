@@ -175,16 +175,18 @@ I test for an interaction effect between `Invader` and `mediainfusion` to see if
 ####
 
 ```{r, eval=FALSE}
-with(assay3, dotchart(Invasion.score, groups = Ps.strain, color = as.numeric(Invader), ylab="Ps.strain", xlab="Invasion.score", main="black=Soft bugs, red=Streptomyces"))
+# with(assay3, dotchart(Invasion.score, groups = Ps.strain, color = as.numeric(Invader), ylab="Ps.strain", xlab="Invasion.score", main="black=Soft bugs, red=Streptomyces"))
 
-print(dotplot(reorder(Inv.strain, Invasion.score) ~ Invasion.score, assay3, groups = Plate, ylab = "Inv.strain", xlab = expression("Mean colony area " ~ (cm^{2})), main = "Inv.strain", type = c("p", "a"), auto.key = list(columns = 3, lines = TRUE)))
+# print(dotplot(reorder(Inv.strain, Invasion.score) ~ Invasion.score, assay3, groups = Plate, ylab = "Inv.strain", xlab = expression("Mean colony area " ~ (cm^{2})), main = "Plates", type = c("p", "a"), auto.key = list(columns = 3, lines = TRUE)))
 
-# print(dotplot(reorder(Ps.strain, Invasion.score) ~ Invasion.score, assay3, groups = Plate, ylab = "Ps.strain", xlab = expression("Mean colony area " ~ (cm^{2})), main = "Ps.strain", type = c("p", "a"), auto.key = list(columns = 3, lines = TRUE)))
+print(dotplot(reorder(Ps.strain, Invasion.score) ~ Invasion.score, assay3, groups = Inv.strain, ylab = "Ps.strain", xlab = expression("Mean colony area " ~ (cm^{2})), main = "Inv.strain", type = c("p", "a"), auto.key = list(columns = 3, lines = TRUE))) 
 
 # with(assay3, dotchart(Invasion.score, groups = Inv.strain, color = as.numeric(Ps.genotype), main="red/green=Ps2, black=Ps1"))
 ```
 
-Dotchart shows that Streptomyces growth is relatively greater on Ps-infused media, but not for all Ps.strains. A large part of the variance is caused by differences amongst Inv.strain.
+Dotchart shows that Streptomyces growth is relatively greater on Ps-infused media, is relatively lower on Control media, and some Ps.strains cause overall low growth. 
+
+Dotplot shows that Inv.strain 18 has highest overall growth (dark green line to the right side).  There is also an Inv.strain 81, 16, or 4, can't tell), which grows very poorly (line on left hand side). A large part of the overall variance is caused by differences amongst Inv.strain.
 
 ```{r Check for correlated residuals}
 M1 <- lm(Invasion.score~Invader*Ps.genotype, data=assay3)
