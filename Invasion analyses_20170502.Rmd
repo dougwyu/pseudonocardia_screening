@@ -5,12 +5,16 @@ date: "02 May 2017"
 output: html_document
 ---
 
-To do:  
-1. analysis with lme: 3 random intercepts (Ps.strain, Inv.strain, Plate) and 3 random slopes, depending on model (mediainfusion, Invader, Ps.genotype)
-2. Significant Invader:mediainfusion interaction: Streptomyces grows relatively more quickly in Ps-infused media
-3. Significant Ps.genotype (Ps1 vs. Ps2 only) main effect:  Ps2 suppresses growth more effectively
+Main results:  
+1. Analysis with lme4: *removal of most of the correlation amongst residuals by using 3 random intercepts* (Ps.strain, Inv.strain, Plate).
+2. Significant Invader:mediainfusion interaction: *Streptomyces grows relatively more quickly in Ps-infused media*
+3. Significant Ps.genotype main effect (using a subset of the data that includes Ps1 and Ps2 only):  *Ps2 suppresses growth more effectively*
+
+To do:
 4. Calculate effect sizes of Invader:mediainfusion interaction, Ps.genotype main effect
 5. fix beeswarm command on line 107.
+6. still some correlated residuals in Plate random effect
+7. get data that lets me convert Inv.strain and Ps.strain random effects to main effects.
 
 ## Housekeeping
 ```{r, message=FALSE}
@@ -218,7 +222,7 @@ AIC(M1, M2) # M1 has lower AIC 220.8375
 coef(M1)
 fixef(M1)
 summary(M1)
-sjp.resid(M1)
+# sjp.resid(M1) # no idea what this is for, and it also wastes cycles
 sjp.lmer(M1, type = "re.qq", y.offset = 0.4)
 sjp.lmer(M1, y.offset = 0.4)
 
@@ -241,32 +245,18 @@ plot(assay3$Ps.genotype, resid(M1), xlab="Ps.genotype", ylab="Residuals"); ablin
 plot(assay3$Invader, resid(M1), xlab="Invader", ylab="Residuals"); abline(0,0)
 ```
 
-The residuals of the random factors no longer show structure. Soft bugs still show greater residual variance than do Streptomyces. 
+The residuals of the random factors show almost no structure (except for Plates, which still has some correlated residuals). Soft bugs show greater residual variance than do Streptomyces. 
 
-Now i try to add fixed-effect variables to the slopes (but not to the Ps.strain/Inv.strain random factor, as those are confounded).
-
+Now i estimate coefficients
 
 ```{r}
-M3 <- lmer(Invasion.score ~ Invader*mediainfusion + (1 + Invader|Ps.strain) + (1|Inv.strain) + (1 + Invader|Plate), data=assay3, REML = FALSE)
-
-M4 <- lmer(Invasion.score ~ Invader + mediainfusion + (1 + Invader|Ps.strain) + (1|Inv.strain) + (1 + Invader|Plate), data=assay3, REML = FALSE)
-
-M5 <- lmer(Invasion.score ~ Invader*mediainfusion + (1|Ps.strain) + (1 + mediainfusion|Inv.strain) + (1 + mediainfusion|Plate), data=assay3, REML = FALSE)
-
-M6 <- lmer(Invasion.score ~ Invader + mediainfusion + (1|Ps.strain) + (1 + mediainfusion|Inv.strain) + (1 + mediainfusion|Plate), data=assay3, REML = FALSE)
-
-
-anova(M3, M4) # Invader as random slope, M3 better AIC 222.79, sig interaction 0.0079
-anova(M5, M6) # mediainfusion as random slope, M5 better AIC 220.51, sig interaction 0.0189
-AIC(M1, M3, M5) # go with M1 model.  Only M1 converges, and it has almost the same low AIC as M5 (both AIC=220.something)
-
 # to estimate coefficients, set REML=TRUE
 M1.1 <- lmer(Invasion.score ~ Invader*mediainfusion + (1|Ps.strain) + (1|Inv.strain) + (1|Plate), data=assay3, REML = TRUE)
 
 # coef(M1.1)
 summary(M1.1)
 fixef(M1.1) # Streptomyces grow relatively faster on Ps-infused media
-sjp.resid(M1.1)
+# sjp.resid(M1.1)
 sjp.lmer(M1.1, type = "re.qq", y.offset = 0.4)
 sjp.lmer(M1.1, y.offset = 0.4)
 qqmath(ranef(M1.1))
@@ -308,25 +298,15 @@ M8 <- lmer(Invasion.score ~ Invader + Ps.genotype + (1|Ps.strain) + (1|Inv.strai
 
 M9  <- lmer(Invasion.score ~ Invader + (1|Ps.strain) + (1|Inv.strain) + (1 |Plate), data=assay6, REML = FALSE)
 
-# M10 <- lmer(Invasion.score ~ Invader*Ps.genotype + (1|Ps.strain) + (1 + Ps.genotype|Inv.strain) + (1 + Ps.genotype|Plate), data=assay6, REML = FALSE)
-# 
-# M11 <- lmer(Invasion.score ~ Invader + Ps.genotype + (1|Ps.strain) + (1 + Ps.genotype|Inv.strain) + (1 + Ps.genotype|Plate), data=assay6, REML = FALSE)
-# 
-# M12 <- lmer(Invasion.score ~ Invader + (1|Ps.strain) + (1 + Ps.genotype|Inv.strain) + (1 + Ps.genotype|Plate), data=assay6, REML = FALSE)
-
 anova(M7, M8) # no sig interaction effect p=0.1537
 anova(M8, M9) # sig effect of Ps.genotype, p=0.004239, best model M8 AIC = 159.82
-
-# anova(M10, M11)
-# anova(M11, M12) # sig effect of Ps.genotype, p=0.025
-# AIC(M8, M11) # M11 superior, AIC = 144.5, Use M11
 
 # Estimate parameters with REML = TRUE
 M8.1 <- lmer(Invasion.score ~ Invader + Ps.genotype + (1|Ps.strain) + (1|Inv.strain) + (1|Plate), data=assay6, REML = TRUE)
 
 summary(M8.1)
 fixef(M8.1) # Ps2 causes a lower growth rate (-0.179)
-sjp.resid(M8.1)
+# sjp.resid(M8.1)
 sjp.lmer(M8.1, type = "re.qq", y.offset = 0.4)
 sjp.lmer(M8.1, y.offset = 0.4)
 qqmath(ranef(M8.1))
@@ -365,7 +345,7 @@ M1.1 <- gls(Invasion.score ~ Invader*mediainfusion, data=assay3)
 summary(M1.1) # aliased to media = control
 ```
 
-# Either way, there is a significant interaction effect, such that Streptomyces do better on 
+Either way, there is a significant interaction effect, such that Streptomyces do better on Ps-infused media
 
 The full model with random factors is:
 
@@ -427,7 +407,7 @@ plot(assay3$mediainfusion, resid(M4), xlab="mediainfusion", ylab="Residuals"); a
 
 ```
 
-M4 has an even lower AIC (281.2), but there is still a lot of heteroscedasticity. I'm done here, for now. 
+M4 has an even lower AIC (281.2), but there is still a lot of heteroscedasticity. I'm done here for now. 
 I can't add `Inv.strain` or `Ps.strain` to the weights function (model doesn't converge). So I'm done.
 
 
@@ -467,7 +447,6 @@ summary(M4full2)
 There is a significant difference between M4full2 and Mfsub2 (p=0.0005), so it is still worth keeping the interaction term. However, the AIC value for M4full2 is higher (258.5) than M4full, so it's worth using M4full and not combining "unknown" into "Ps2".
 
 Streptomyces grows relatively faster on Ps1/2 media. 
-
 
 
 ```{r, eval=FALSE, include=FALSE}
