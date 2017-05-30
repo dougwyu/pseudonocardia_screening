@@ -450,6 +450,6 @@ Streptomyces grows relatively faster on Ps1/2 media.
 
 
 ```{r, eval=FALSE, include=FALSE}
-purl("Invasion analyses 20170502.Rmd")
+purl("Invasion analyses_20170502.Rmd")
 ```
 
