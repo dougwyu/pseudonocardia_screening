@@ -5,6 +5,8 @@ date: "02 May 2017"
 output: html_document
 ---
 
+**  interesting point to consider for analysis.  One of the Strepto strains (coelicolorM1146) has had its antibiotic production clusters (4 of them) deleted and thus might grow intrinsically faster.  need to check. 
+
 Main results:  
 1. Analysis with lme4: *removal of most of the correlation amongst residuals by using 3 random intercepts* (Ps.strain, Inv.strain, Plate).
 2. Significant Invader:mediainfusion interaction: *Streptomyces grows relatively more quickly in Ps-infused media*
@@ -29,6 +31,7 @@ library(forcats)
 library(beeswarm)
 library(lme4)
 library(sjPlot)
+library(openxlsx)
 # tidyverse_packages()
 ```
 
@@ -106,7 +109,7 @@ tbl_df(assay3)
 xtabs(~ Inv.strain + Ps.strain, assay3)
 ```
 
-```{r}
+```{r boxplot of results}
 boxplot(Invasion.score~Invader:Ps.genotype, ylab=expression("Mean colony area " ~ (cm^{2})), cex.axis=.7, cex.lab=0.8, outline=FALSE, ylim=c(0.0,1.8), whisklty=0, staplelty=0, boxlty=1, boxwex=0.3, data=assay3)
 
 # beeswarm(Invasion.score~Invader:Ps.genotype, vertical=TRUE, pch=16, method="swarm", cex=.6, col=as.numeric(assay3$Ps.strain), add=TRUE, data=assay3)
@@ -114,15 +117,22 @@ boxplot(Invasion.score~Invader:Ps.genotype, ylab=expression("Mean colony area " 
 stripchart(Invasion.score~Invader:Ps.genotype, vertical=TRUE, pch=16, method="jitter", jitter=.03, cex=.3, add=TRUE, data=assay3)
 ```
 
-```{r assay4 summary data table and boxplot, eval=FALSE}
-# assay4 <- assay3 %>% group_by(Ps.strain, Ps.genotype, Invader, Inv.strain) %>% summarise(mean.Invasion.score=mean(Invasion.score))
-# 
-# boxplot(mean.Invasion.score~Invader:Ps.genotype, ylab=expression("Mean colony area " ~ (cm^{2})), cex.axis=.7, cex.lab=0.8, outline=FALSE, ylim=c(0.0,1.8), whisklty=0, staplelty=0, boxlty=1, boxwex=0.3, data=assay4)
-# 
-# stripchart(mean.Invasion.score~Invader:Ps.genotype, vertical=TRUE, pch=16, method="jitter", jitter=.02, cex=.4, add=TRUE, data=assay4)
+These are used to choose strains for the competition experiment
+```{r assay4 summary data tables, eval=FALSE}
+(assay4.1 <- assay3 %>% group_by(Ps.genotype, Invader) %>% summarise(median.Invasion.score=round(median(Invasion.score), 2)))
+
+assay4.2 <- assay3 %>% group_by(Ps.genotype, Invader, Inv.strain) %>% summarise(median.Invasion.score=round(median(Invasion.score), 2))
+assay4.2 <- assay4.2 %>% arrange(Ps.genotype, Invader, median.Invasion.score)
+assay4.3 <- assay3 %>% group_by(Ps.genotype, Ps.strain, Invader, Inv.strain) %>% summarise(median.Invasion.score=round(median(Invasion.score), 2))
+
+write.table(assay4.1, file = "assay4.1.tsv", quote = FALSE, sep = "\t") # use this to choose summary pairs for the competition experiment
+write.table(assay4.2, file = "assay4.2.tsv", quote = FALSE, sep = "\t") # use this to choose summary pairs for the competition experiment
+write.table(assay4.3, file = "assay4.3.tsv", quote = FALSE, sep = "\t") # use this to choose summary pairs for the competition experiment
+
+# openxlsx::write.xlsx(assay4.2, file = "assay4.2_test.xlsx", colNames = TRUE)
 ```
 
-To read this figure:
+To read the boxplot:
 The y-axis is the area (cm^2^) of the invading colony's growth. 
 1. On control media (left 2 columns), Soft-bug colonies are bigger than Streptomyces colonies (i.e. Streptomyces grow more slowly). 
 2. However, on Pseudonocardia media (Ps1, Ps2, unknown genotypes), Soft-bug colonies are smaller. (i.e. Streptomyces colonies grow more quickly).
@@ -338,7 +348,7 @@ plot(assay6$Invader, resid(M8.1), xlab="Invader", ylab="Residuals"); abline(0,0)
 # nlme mixed-effect model (dataset = assay3)
 The full model with no random factors is:
 
-```{r}
+```{r, eval=FALSE, include=FALSE}
 M1 <- gls(Invasion.score ~ Invader*Ps.genotype, data=assay3)
 summary(M1) # aliased to Ps.genotype = control. 
 M1.1 <- gls(Invasion.score ~ Invader*mediainfusion, data=assay3)
@@ -349,7 +359,7 @@ Either way, there is a significant interaction effect, such that Streptomyces do
 
 The full model with random factors is:
 
-```{r}
+```{r, eval=FALSE, include=FALSE}
 M2 <- lme(Invasion.score~Invader*Ps.genotype, random = ~1 | Inv.strain, data=assay3)
 M2.1 <- lme(Invasion.score~Invader*Ps.genotype, random = ~1 | Ps.strain, data=assay3)
 
@@ -361,7 +371,7 @@ anova(M1,M1.1,M2,M2.1)
 
 M2 has a much lower AIC value (379.0) than M1 (1074.9), M1.1 (1082.7), and M2.1 (1061.5), which isn't too surprising, since we saw autocorrelated residuals.
 
-```{r}
+```{r, eval=FALSE, include=FALSE}
 plot(M1, col=as.numeric(assay3$Ps.genotype))
 plot(M1.1, col=as.numeric(assay3$mediainfusion))
 plot(M2, col=as.numeric(assay3$Ps.genotype))
@@ -369,7 +379,7 @@ plot(M2, col=as.numeric(assay3$Invader))
 ```
 
 Random and Fixed factors:
-```{r}
+```{r, eval=FALSE, include=FALSE}
 plot(assay3$Ps.strain, resid(M2), xlab="Ps.strain", ylab="Residuals"); abline(0,0)
 plot(assay3$Inv.strain, resid(M2), xlab="Inv.strain", ylab="Residuals"); abline(0,0)
 plot(assay3$Plate, resid(M2), xlab="Plate", ylab="Residuals"); abline(0,0)
@@ -384,7 +394,7 @@ Ps.strain and Plate have heterogeneous residuals (less so Inv.strain).
 Invader, Ps.genotype, and medinfusion have heterogeneous residuals.  In particular, Softbugs have larger residuals than do Streptomyces, which is probably because they have a wider range of genotypes (different genera).
 
 Trying to remove heteroscedasticity.
-```{r}
+```{r, eval=FALSE, include=FALSE}
 M3 <- lme(Invasion.score~Invader*Ps.genotype, random = ~ 1 | Inv.strain, weights = varIdent(form = ~ 1 | Invader), data=assay3)
 
 anova(M2, M3)
@@ -394,7 +404,7 @@ boxplot(E3 ~ Invader, ylab="Normalized residuals", vertical=T, data=assay3)
 
 M3 has a lower AIC (288.0) but still has heterogeneous residuals (less so than in M2, however). 
 
-```{r}
+```{r, eval=FALSE, include=FALSE}
 M4 <- lme(Invasion.score~Invader*Ps.genotype, random = ~ 1 | Inv.strain, weights = varIdent(form = ~ 1 | Invader*Ps.genotype), data=assay3)
 
 anova(M2, M3, M4)
@@ -411,7 +421,7 @@ M4 has an even lower AIC (281.2), but there is still a lot of heteroscedasticity
 I can't add `Inv.strain` or `Ps.strain` to the weights function (model doesn't converge). So I'm done.
 
 
-```{r}
+```{r, eval=FALSE, include=FALSE}
 M4full <- lme(Invasion.score~Invader*Ps.genotype, random = ~ 1 | Inv.strain, weights = varIdent(form = ~ 1 | Invader*Ps.genotype), method = "ML", data=assay3)
 
 M4sub <- update(M4full, ~.-Invader*Ps.genotype)
@@ -421,7 +431,7 @@ anova(M4full, M4sub)
 
 Removal of the interaction term results in a significant difference (p<0.0001), and M4full has a lower AIC value (246.3) compared to M4sub (AIC = 325.1), so we keep the full model.
 
-```{r}
+```{r, eval=FALSE, include=FALSE}
 Mfinal <- lme(Invasion.score~Invader*Ps.genotype, random = ~ 1 | Inv.strain, weights = varIdent(form = ~ 1 | Invader*Ps.genotype), method = "REML", data=assay3)
 
 qqnorm(Mfinal)
@@ -431,8 +441,9 @@ summary(Mfinal)
 
 However, I suspect that Ps.genotype 'unknown' is really Ps2. So let's combine "Ps2" and "unknown" into Ps2.
 
-```{r Combining Ps.genotypes}
+```{r Combining Ps.genotypes, eval=FALSE, include=FALSE}
 assay3$Ps.genotype.comb <- fct_collapse(assay3$Ps.genotype, Ps2 = c("Ps2", "unknown", "unknown"), Ps1 = c("Ps1"), Control = c("Control"))
+
 assay3$Ps.genotype.comb <- as.factor(assay3$Ps.genotype.comb)
 
 M4full2 <- lme(Invasion.score~Invader*Ps.genotype.comb, random = ~ 1 | Inv.strain, weights = varIdent(form = ~ 1 | Invader*Ps.genotype.comb), method = "ML", data=assay3)
@@ -444,9 +455,9 @@ anova(M4full, M4full2)
 summary(M4full2)
 ```
 
-There is a significant difference between M4full2 and Mfsub2 (p=0.0005), so it is still worth keeping the interaction term. However, the AIC value for M4full2 is higher (258.5) than M4full, so it's worth using M4full and not combining "unknown" into "Ps2".
+There is a significant difference between M4full2 and Mfsub2 (p<0.0001), so it is still worth keeping the interaction term. Streptomyces grows relatively faster on Ps1/2 media. 
 
-Streptomyces grows relatively faster on Ps1/2 media. 
+However, the AIC value for M4full2 is higher (258.5) than M4full, so it's worth using M4full and not combining "unknown" into "Ps2".
 
 
 ```{r, eval=FALSE, include=FALSE}
