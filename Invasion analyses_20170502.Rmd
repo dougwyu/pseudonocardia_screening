@@ -39,6 +39,7 @@ library(openxlsx)
 datafile <- "Block 2 Ps bioassays_data tables_20170502_20170516.xlsx"
 ```
 
+A test sentence.
 
 ## Assay 1:  Can _Streptomyces_ invade an antibiotic-laden environment (_Pseudonocardia_)?
 ```{r}
